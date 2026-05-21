@@ -1,0 +1,729 @@
+
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>복사 평형 인터랙티브 워크북</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/dom-to-image/2.6.0/dom-to-image.min.js"></script>
+    
+    <style>
+        body {
+            font-family: 'Noto Sans KR', sans-serif;
+            background-color: #f0f4f8; /* Very light blue/gray */
+        }
+        
+        /* Custom Animations */
+        @keyframes flowDown {
+            0% { transform: translateY(-100%); opacity: 0; }
+            50% { opacity: 1; }
+            100% { transform: translateY(100%); opacity: 0; }
+        }
+        @keyframes radiateHeat {
+            0% { transform: scale(1) translateY(0); opacity: 0.8; }
+            100% { transform: scale(1.5) translateY(-20px); opacity: 0; }
+        }
+        @keyframes waveHeat {
+            0% { transform: translateX(0); opacity: 0.8; }
+            100% { transform: translateX(20px); opacity: 0; }
+        }
+
+        .water-stream {
+            background: linear-gradient(to bottom, rgba(59, 130, 246, 0.5), rgba(59, 130, 246, 0.8));
+        }
+        
+        .heat-arrow {
+            position: absolute;
+            color: #ef4444; /* red-500 */
+            animation: radiateHeat 2s infinite ease-out;
+        }
+        
+        .radiation-wave {
+            color: #f59e0b; /* amber-500 */
+            animation: waveHeat 1.5s infinite linear;
+        }
+
+        /* Glassmorphism for cards */
+        .glass-card {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+        }
+
+        /* Hide elements utility */
+        .hidden-step { display: none; opacity: 0; transition: opacity 0.5s ease; }
+        .show-step { display: block; opacity: 1; animation: fadeIn 0.5s ease forwards; }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Report Style */
+        #report-capture-area {
+            background: white;
+            background-image: radial-gradient(#e2e8f0 1px, transparent 1px);
+            background-size: 20px 20px;
+        }
+    </style>
+</head>
+<body class="text-gray-800 h-screen flex flex-col">
+
+    <!-- Header -->
+    <header class="bg-blue-600 text-white p-4 shadow-md sticky top-0 z-50">
+        <div class="max-w-4xl mx-auto flex justify-between items-center">
+            <h1 class="text-xl font-bold flex items-center gap-2">
+                <i class="fas fa-flask"></i> 중학교 과학: 복사 평형
+            </h1>
+            <div class="text-sm bg-blue-700 px-3 py-1 rounded-full">
+                Stage <span id="current-stage-display">1</span> / 4
+            </div>
+        </div>
+        <!-- Progress Bar -->
+        <div class="max-w-4xl mx-auto mt-3 bg-blue-800 rounded-full h-2 overflow-hidden">
+            <div id="progress-bar" class="bg-yellow-400 h-2 transition-all duration-500" style="width: 25%"></div>
+        </div>
+    </header>
+
+    <!-- Main Content Area -->
+    <main class="flex-grow flex items-center justify-center p-4">
+        <div class="max-w-4xl w-full">
+
+            <!-- ================= STAGE 1: 물통 아날로그 ================= -->
+            <section id="stage-1" class="glass-card rounded-2xl p-6 lg:p-8 active-stage">
+                <h2 class="text-2xl font-bold text-blue-700 mb-2">Stage 1. 에너지 평형의 이해 (물통 모델)</h2>
+                <p class="text-gray-600 mb-6">위에서 물이 들어오고 아래로 물이 빠져나가는 물통을 관찰해 봅시다.</p>
+
+                <div class="flex flex-col md:flex-row gap-8 items-center justify-center mb-8 bg-blue-50 p-6 rounded-xl border border-blue-100 relative">
+                    <!-- Animation Area -->
+                    <div class="relative w-64 h-64 flex flex-col items-center">
+                        <!-- Inflow -->
+                        <div class="w-8 h-16 water-stream absolute top-0 rounded-b-md"></div>
+                        <i class="fas fa-arrow-down absolute top-4 text-blue-800 text-xl animate-bounce"></i>
+                        <span class="absolute top-2 -left-20 text-sm font-bold text-blue-800">유입 (일정)</span>
+
+                        <!-- Bucket -->
+                        <div class="w-32 h-40 border-4 border-t-0 border-gray-400 rounded-b-xl absolute bottom-12 overflow-hidden bg-white z-10">
+                            <!-- Water Level -->
+                            <div id="bucket-water" class="w-full bg-blue-400 absolute bottom-0 transition-all duration-300" style="height: 10%;"></div>
+                        </div>
+
+                        <!-- Outflow -->
+                        <div class="absolute bottom-12 -right-4 flex items-center">
+                            <div class="w-8 h-4 bg-gray-400"></div> <!-- Pipe -->
+                            <div id="bucket-outflow" class="h-4 water-stream rounded-r-full transition-all duration-300" style="width: 10px;"></div>
+                            <span class="ml-2 text-sm font-bold text-blue-800">유출 (수위에 비례)</span>
+                        </div>
+                    </div>
+                    
+                    <div class="flex-1">
+                        <button onclick="startBucketAnimation()" class="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg shadow transition w-full md:w-auto mb-4">
+                            <i class="fas fa-play"></i> 실험 시작
+                        </button>
+                        <p class="text-sm text-gray-500 bg-white p-3 rounded border">
+                            수위가 높아지면 수압이 세져서 나가는 물의 양이 많아집니다. 어느 순간 수위가 멈춥니다!
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Question & Hints -->
+                <div class="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
+                    <h3 class="text-lg font-bold mb-3"><i class="fas fa-question-circle text-blue-500"></i> 핵심 질문</h3>
+                    <p class="text-lg mb-4 font-medium">"물통의 수위가 일정하게 유지될 때, 들어오는 물의 양과 나가는 물의 양은 어떤 관계일까?"</p>
+                    
+                    <button onclick="revealHint(1)" class="mb-4 text-sm bg-yellow-100 hover:bg-yellow-200 text-yellow-800 py-1.5 px-4 rounded-full border border-yellow-300 transition">
+                        <i class="fas fa-lightbulb"></i> 힌트 보기 (<span id="hint-count-1">0</span>/3)
+                    </button>
+
+                    <!-- Hint 1: Visual -->
+                    <div id="hint-1-1" class="hidden-step mb-4 p-4 bg-gray-50 rounded-lg border flex items-center justify-center gap-4">
+                        <div class="text-center"><div class="text-blue-500 text-2xl font-bold">들어오는 물</div><i class="fas fa-arrow-down text-blue-300 text-3xl"></i></div>
+                        <div class="text-2xl font-black text-gray-400">=</div>
+                        <div class="text-center"><div class="text-blue-500 text-2xl font-bold">나가는 물</div><i class="fas fa-arrow-right text-blue-300 text-3xl"></i></div>
+                    </div>
+                    
+                    <!-- Hint 2: Blank -->
+                    <div id="hint-1-2" class="hidden-step mb-4 p-4 bg-blue-50 rounded-lg border text-blue-900 font-medium">
+                        "들어오는 양과 <span class="inline-block w-20 border-b-2 border-blue-500 mx-1 text-center bg-white">&nbsp;</span> 양이 같을 때 수위가 일정하다."
+                    </div>
+
+                    <!-- Hint 3: Multiple Choice -->
+                    <div id="hint-1-3" class="hidden-step">
+                        <p class="text-sm text-gray-500 mb-2">정답을 선택하세요:</p>
+                        <div class="flex gap-4">
+                            <label class="flex items-center gap-2 cursor-pointer p-3 border rounded-lg hover:bg-blue-50 transition w-full">
+                                <input type="radio" name="ans1" value="같다" class="w-5 h-5 text-blue-600" onchange="checkAnswer(1)"> (1) 같다
+                            </label>
+                            <label class="flex items-center gap-2 cursor-pointer p-3 border rounded-lg hover:bg-blue-50 transition w-full">
+                                <input type="radio" name="ans1" value="크다" class="w-5 h-5 text-blue-600" onchange="checkAnswer(1)"> (2) 크다
+                            </label>
+                            <label class="flex items-center gap-2 cursor-pointer p-3 border rounded-lg hover:bg-blue-50 transition w-full">
+                                <input type="radio" name="ans1" value="작다" class="w-5 h-5 text-blue-600" onchange="checkAnswer(1)"> (3) 작다
+                            </label>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ================= STAGE 2-1: 검은 컵 실험 ================= -->
+            <section id="stage-2" class="glass-card rounded-2xl p-6 lg:p-8 hidden">
+                <h2 class="text-2xl font-bold text-blue-700 mb-2">Stage 2-1. 복사 평형 도달하기</h2>
+                <p class="text-gray-600 mb-6">전등(태양 역할)이 검은 컵(지구 역할)을 비출 때 온도의 변화를 관찰해 봅시다.</p>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                    <!-- Animation -->
+                    <div class="bg-gray-900 p-6 rounded-xl relative flex flex-col items-center justify-center overflow-hidden h-64">
+                        <i class="fas fa-lightbulb text-yellow-300 text-5xl absolute top-4 left-1/2 transform -translate-x-1/2" id="lamp-2"></i>
+                        <!-- Heat waves from lamp -->
+                        <div class="absolute top-16 text-yellow-500 flex flex-col gap-1 opacity-0" id="lamp-rays-2">
+                            <i class="fas fa-chevron-down animate-pulse"></i>
+                            <i class="fas fa-chevron-down animate-pulse delay-75"></i>
+                            <i class="fas fa-chevron-down animate-pulse delay-150"></i>
+                        </div>
+                        
+                        <!-- Cup -->
+                        <div class="w-20 h-24 bg-gray-700 rounded-b-xl border-t-0 border-2 border-gray-500 absolute bottom-10 flex items-center justify-center relative">
+                             <div class="absolute w-full h-full bg-black rounded-b-xl opacity-50"></div>
+                             <span class="text-white text-xs z-10">알루미늄 컵</span>
+                             <!-- Radiating Heat (Hidden initially) -->
+                             <div id="cup-radiation-2" class="absolute inset-0 hidden">
+                                 <i class="fas fa-fire-alt heat-arrow top-0 left-2"></i>
+                                 <i class="fas fa-fire-alt heat-arrow top-0 right-2" style="animation-delay: 0.5s"></i>
+                                 <i class="fas fa-fire-alt heat-arrow top-4 left-1/2" style="animation-delay: 1s"></i>
+                             </div>
+                        </div>
+                        <button onclick="startCupExperiment()" class="absolute bottom-2 px-3 py-1 bg-yellow-500 hover:bg-yellow-600 text-white text-sm rounded shadow">
+                            전등 켜기
+                        </button>
+                    </div>
+
+                    <!-- Graph Area -->
+                    <div class="bg-white border p-4 rounded-xl flex flex-col">
+                        <h4 class="text-center font-bold text-sm text-gray-600 mb-2">시간에 따른 온도 변화</h4>
+                        <div class="flex-grow relative border-l-2 border-b-2 border-gray-400 p-2">
+                            <span class="absolute -left-6 top-0 text-xs text-gray-500">온도</span>
+                            <span class="absolute bottom-[-20px] right-0 text-xs text-gray-500">시간</span>
+                            
+                            <!-- SVG Graph -->
+                            <svg class="w-full h-full overflow-visible" preserveAspectRatio="none">
+                                <!-- Dashed equilibrium line -->
+                                <line x1="0" y1="20%" x2="100%" y2="20%" stroke="#e5e7eb" stroke-width="2" stroke-dasharray="5,5" />
+                                <text x="100%" y="15%" fill="#9ca3af" font-size="10" text-anchor="end">복사 평형 온도</text>
+                                <!-- Temperature curve path drawn via JS -->
+                                <path id="temp-curve" d="M 0 100" fill="none" stroke="#ef4444" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+                            </svg>
+                            <!-- Current Temp Indicator -->
+                            <div id="temp-indicator" class="absolute bottom-0 left-0 bg-red-500 w-3 h-3 rounded-full shadow transform -translate-x-1.5 -translate-y-1.5 transition-all duration-75"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Question & Hints -->
+                <div class="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
+                    <h3 class="text-lg font-bold mb-3"><i class="fas fa-question-circle text-blue-500"></i> 핵심 질문</h3>
+                    <p class="text-lg mb-4 font-medium">"컵의 온도가 일정해지는 '복사 평형' 상태일 때, 컵이 흡수하는 에너지와 <span class="border-b-2 border-blue-500 text-blue-600 px-2">[ &nbsp; &nbsp; ]</span>하는 에너지는 어떠할까?"</p>
+                    
+                    <button onclick="revealHint(2)" class="mb-4 text-sm bg-yellow-100 hover:bg-yellow-200 text-yellow-800 py-1.5 px-4 rounded-full border border-yellow-300 transition">
+                        <i class="fas fa-lightbulb"></i> 힌트 보기 (<span id="hint-count-2">0</span>/3)
+                    </button>
+
+                    <!-- Hint 1: Visual -->
+                    <div id="hint-2-1" class="hidden-step mb-4 p-4 bg-gray-50 rounded-lg border flex flex-col items-center">
+                        <p class="text-sm text-gray-600 mb-2">온도가 올라가면 컵에서도 열(에너지)이 빠져나갑니다.</p>
+                        <div class="flex items-center gap-4">
+                            <div class="text-yellow-500 text-xl font-bold flex flex-col items-center"><span>흡수</span><i class="fas fa-arrow-down"></i></div>
+                            <div class="w-16 h-16 bg-black rounded-lg border-2 border-gray-400"></div>
+                            <div class="text-red-500 text-xl font-bold flex flex-col items-center"><i class="fas fa-arrow-up"></i><span>?</span></div>
+                        </div>
+                    </div>
+                    
+                    <!-- Hint 2: Blank text -->
+                    <div id="hint-2-2" class="hidden-step mb-4 p-4 bg-blue-50 rounded-lg border text-blue-900 font-medium">
+                        "흡수하는 에너지와 <strong>방출</strong>하는 에너지가 <span class="bg-yellow-200 px-1">같기</span> 때문이다."
+                    </div>
+
+                    <!-- Hint 3: Multiple Choice -->
+                    <div id="hint-2-3" class="hidden-step">
+                        <p class="text-sm text-gray-500 mb-2">빈칸에 들어갈 알맞은 단어를 선택하세요:</p>
+                        <div class="flex gap-4">
+                            <label class="flex items-center gap-2 cursor-pointer p-3 border rounded-lg hover:bg-blue-50 transition w-full">
+                                <input type="radio" name="ans2" value="방출" class="w-5 h-5 text-blue-600" onchange="checkAnswer(2)"> (1) 방출
+                            </label>
+                            <label class="flex items-center gap-2 cursor-pointer p-3 border rounded-lg hover:bg-blue-50 transition w-full">
+                                <input type="radio" name="ans2" value="반사" class="w-5 h-5 text-blue-600" onchange="checkAnswer(2)"> (2) 반사
+                            </label>
+                            <label class="flex items-center gap-2 cursor-pointer p-3 border rounded-lg hover:bg-blue-50 transition w-full">
+                                <input type="radio" name="ans2" value="차단" class="w-5 h-5 text-blue-600" onchange="checkAnswer(2)"> (3) 차단
+                            </label>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ================= STAGE 2-2: 거리 변화 실험 ================= -->
+            <section id="stage-3" class="glass-card rounded-2xl p-6 lg:p-8 hidden">
+                <h2 class="text-2xl font-bold text-blue-700 mb-2">Stage 2-2. 거리와 복사 평형 온도</h2>
+                <p class="text-gray-600 mb-6">전등과 컵 사이의 거리에 따라 평형 온도가 어떻게 달라지는지 비교해 봅시다.</p>
+
+                <div class="bg-gray-900 p-8 rounded-xl relative flex items-center justify-between overflow-hidden h-64 mb-6 border-4 border-gray-800 shadow-inner">
+                    <!-- Lamp -->
+                    <div id="movable-lamp" class="transition-all duration-700 ease-in-out absolute left-10 flex items-center">
+                        <i class="fas fa-lightbulb text-yellow-300 text-6xl" style="filter: drop-shadow(0 0 20px yellow);"></i>
+                        <!-- Radiation waves -->
+                        <div id="dist-waves" class="ml-4 flex gap-2">
+                            <i class="fas fa-wifi fa-rotate-90 radiation-wave text-3xl"></i>
+                            <i class="fas fa-wifi fa-rotate-90 radiation-wave text-4xl delay-75"></i>
+                            <i class="fas fa-wifi fa-rotate-90 radiation-wave text-5xl delay-150"></i>
+                        </div>
+                    </div>
+
+                    <!-- Cup -->
+                    <div class="absolute right-10 flex flex-col items-center">
+                        <!-- Thermometer above cup -->
+                        <div class="w-4 h-16 bg-gray-200 rounded-full border-2 border-gray-400 mb-2 relative overflow-hidden">
+                            <div id="dist-thermo" class="absolute bottom-0 w-full bg-red-500 transition-all duration-1000 h-[50%]"></div>
+                        </div>
+                        <div class="w-16 h-20 bg-black rounded-b-xl border-t-0 border-2 border-gray-500 relative flex justify-center">
+                            <!-- Outgoing heat -->
+                            <div id="dist-out-heat" class="absolute -top-4 flex gap-1 transition-opacity duration-500">
+                                <i class="fas fa-chevron-up text-red-500 text-xs animate-bounce"></i>
+                                <i class="fas fa-chevron-up text-red-500 text-xs animate-bounce delay-75"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="flex justify-center gap-4 mb-8">
+                    <button onclick="setDistance('close')" class="px-6 py-3 bg-red-500 hover:bg-red-600 text-white font-bold rounded-xl shadow-lg transform transition active:scale-95 flex items-center gap-2">
+                        <i class="fas fa-compress-arrows-alt"></i> 가깝게
+                    </button>
+                    <button onclick="setDistance('far')" class="px-6 py-3 bg-blue-500 hover:bg-blue-600 text-white font-bold rounded-xl shadow-lg transform transition active:scale-95 flex items-center gap-2">
+                        <i class="fas fa-expand-arrows-alt"></i> 멀게
+                    </button>
+                </div>
+
+                <!-- Question & Hints -->
+                <div class="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
+                    <h3 class="text-lg font-bold mb-3"><i class="fas fa-question-circle text-blue-500"></i> 핵심 질문</h3>
+                    <p class="text-lg mb-4 font-medium">"전등(에너지원)과의 거리가 멀어지면, 복사 평형 온도는 어떻게 변할까?"</p>
+                    
+                    <button onclick="revealHint(3)" class="mb-4 text-sm bg-yellow-100 hover:bg-yellow-200 text-yellow-800 py-1.5 px-4 rounded-full border border-yellow-300 transition">
+                        <i class="fas fa-lightbulb"></i> 힌트 보기 (<span id="hint-count-3">0</span>/3)
+                    </button>
+
+                    <!-- Hint 1: Visual -->
+                    <div id="hint-3-1" class="hidden-step mb-4 p-4 bg-gray-50 rounded-lg border grid grid-cols-2 gap-4 text-center">
+                        <div>
+                            <p class="text-sm font-bold text-red-600 mb-1">가까울 때</p>
+                            <div class="text-2xl text-yellow-500"><i class="fas fa-fire"></i><i class="fas fa-fire"></i><i class="fas fa-fire"></i></div>
+                            <p class="text-xs text-gray-500">도달하는 에너지 많음</p>
+                        </div>
+                        <div class="border-l border-gray-300">
+                            <p class="text-sm font-bold text-blue-600 mb-1">멀 때</p>
+                            <div class="text-xl text-yellow-500"><i class="fas fa-fire"></i></div>
+                            <p class="text-xs text-gray-500">도달하는 에너지 적음</p>
+                        </div>
+                    </div>
+                    
+                    <!-- Hint 2: Blank -->
+                    <div id="hint-3-2" class="hidden-step mb-4 p-4 bg-blue-50 rounded-lg border text-blue-900 font-medium">
+                        "거리가 멀어지면 공급되는 에너지가 적어져서 더 <span class="inline-block w-16 border-b-2 border-blue-500 mx-1 text-center bg-white text-red-500 font-bold">?</span> 온도에서 평형을 이룬다."
+                    </div>
+
+                    <!-- Hint 3: Multiple Choice -->
+                    <div id="hint-3-3" class="hidden-step">
+                        <p class="text-sm text-gray-500 mb-2">정답을 선택하세요:</p>
+                        <div class="flex gap-4">
+                            <label class="flex items-center gap-2 cursor-pointer p-3 border rounded-lg hover:bg-blue-50 transition w-full">
+                                <input type="radio" name="ans3" value="낮은" class="w-5 h-5 text-blue-600" onchange="checkAnswer(3)"> (1) 낮은
+                            </label>
+                            <label class="flex items-center gap-2 cursor-pointer p-3 border rounded-lg hover:bg-blue-50 transition w-full">
+                                <input type="radio" name="ans3" value="높은" class="w-5 h-5 text-blue-600" onchange="checkAnswer(3)"> (2) 높은
+                            </label>
+                            <label class="flex items-center gap-2 cursor-pointer p-3 border rounded-lg hover:bg-blue-50 transition w-full">
+                                <input type="radio" name="ans3" value="똑같은" class="w-5 h-5 text-blue-600" onchange="checkAnswer(3)"> (3) 똑같은
+                            </label>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ================= STAGE 4: 결과 보고서 ================= -->
+            <section id="stage-4" class="glass-card rounded-2xl p-6 lg:p-8 hidden">
+                <h2 class="text-2xl font-bold text-blue-700 mb-6 text-center"><i class="fas fa-clipboard-check"></i> 실험 완료! 학습 결과지 생성</h2>
+                
+                <!-- Student Info Form -->
+                <div id="student-form" class="max-w-md mx-auto bg-white p-6 rounded-xl border shadow-sm mb-6">
+                    <h3 class="font-bold text-gray-700 mb-4 border-b pb-2">학생 정보 입력</h3>
+                    <div class="grid grid-cols-2 gap-4 mb-4">
+                        <div>
+                            <label class="block text-sm text-gray-600 mb-1">학년</label>
+                            <input type="number" id="info-grade" class="w-full border rounded p-2 focus:ring-2 focus:ring-blue-400 outline-none" min="1" max="3" value="3">
+                        </div>
+                        <div>
+                            <label class="block text-sm text-gray-600 mb-1">반</label>
+                            <input type="number" id="info-class" class="w-full border rounded p-2 focus:ring-2 focus:ring-blue-400 outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-sm text-gray-600 mb-1">번호</label>
+                            <input type="number" id="info-num" class="w-full border rounded p-2 focus:ring-2 focus:ring-blue-400 outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-sm text-gray-600 mb-1">이름</label>
+                            <input type="text" id="info-name" class="w-full border rounded p-2 focus:ring-2 focus:ring-blue-400 outline-none" placeholder="홍길동">
+                        </div>
+                    </div>
+                    <button onclick="generateReport()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-lg transition">
+                        결과지 확인하기
+                    </button>
+                </div>
+
+                <!-- Generated Report (Hidden initially) -->
+                <div id="final-report-container" class="hidden flex flex-col items-center">
+                    <!-- The actual area to be captured by dom-to-image -->
+                    <div id="report-capture-area" class="w-full max-w-2xl border-2 border-gray-800 rounded-xl p-8 shadow-2xl relative bg-white">
+                        <!-- Background decoration -->
+                        <div class="absolute top-0 right-0 p-4 opacity-10">
+                            <i class="fas fa-sun text-9xl"></i>
+                        </div>
+                        
+                        <div class="border-b-4 border-blue-600 pb-4 mb-6 text-center">
+                            <h1 class="text-3xl font-black text-gray-800 tracking-tight">복사 평형 실험 보고서</h1>
+                            <p class="text-gray-500 mt-2 font-medium" id="display-user-info"></p>
+                        </div>
+
+                        <div class="space-y-6 relative z-10">
+                            <!-- Answer 1 -->
+                            <div class="bg-blue-50 p-4 rounded-lg border border-blue-100">
+                                <h4 class="font-bold text-blue-800 mb-2">1. 에너지 평형 (물통 모델)</h4>
+                                <p class="text-gray-700">Q: 수위가 일정하게 유지될 때, 들어오는 양과 나가는 양의 관계는?</p>
+                                <p class="text-lg font-bold text-blue-600 mt-2">나의 답: <span id="res-ans1" class="bg-yellow-200 px-2 rounded"></span></p>
+                                <p class="text-sm text-gray-500 mt-1">✓ 유입량과 유출량이 같을 때 평형을 이룹니다.</p>
+                            </div>
+                            <!-- Answer 2 -->
+                            <div class="bg-blue-50 p-4 rounded-lg border border-blue-100">
+                                <h4 class="font-bold text-blue-800 mb-2">2. 복사 평형 도달</h4>
+                                <p class="text-gray-700">Q: 복사 평형 상태일 때, 흡수하는 에너지와 [ ? ]하는 에너지가 같다.</p>
+                                <p class="text-lg font-bold text-blue-600 mt-2">나의 답: <span id="res-ans2" class="bg-yellow-200 px-2 rounded"></span></p>
+                                <p class="text-sm text-gray-500 mt-1">✓ 물체는 에너지를 흡수하는 동시에 방출합니다.</p>
+                            </div>
+                            <!-- Answer 3 -->
+                            <div class="bg-blue-50 p-4 rounded-lg border border-blue-100">
+                                <h4 class="font-bold text-blue-800 mb-2">3. 거리와 평형 온도</h4>
+                                <p class="text-gray-700">Q: 에너지원과의 거리가 멀어지면 복사 평형 온도는 어떻게 변할까?</p>
+                                <p class="text-lg font-bold text-blue-600 mt-2">나의 답: <span id="res-ans3" class="bg-yellow-200 px-2 rounded"></span></p>
+                                <p class="text-sm text-gray-500 mt-1">✓ 지구와 태양의 거리에 따라 지구의 평균 기온이 결정됩니다.</p>
+                            </div>
+                        </div>
+                        
+                        <div class="mt-8 text-center text-sm text-gray-400 border-t pt-4">
+                            <p>본 결과지는 중학교 과학 '복사 평형' 시뮬레이션 학습을 통해 작성되었습니다.</p>
+                            <p id="report-date"></p>
+                        </div>
+                    </div>
+
+                    <div class="mt-6 flex gap-4">
+                        <button onclick="downloadPNG()" class="px-8 py-3 bg-green-500 hover:bg-green-600 text-white font-bold rounded-full shadow-lg transform transition active:scale-95 flex items-center gap-2">
+                            <i class="fas fa-file-download"></i> PNG 이미지로 저장하기
+                        </button>
+                    </div>
+                    <p id="download-msg" class="mt-2 text-sm text-green-600 hidden font-bold"><i class="fas fa-check"></i> 다운로드가 시작되었습니다!</p>
+                </div>
+            </section>
+
+        </div>
+    </main>
+
+    <!-- Navigation Footer -->
+    <footer class="bg-white border-t p-4 flex justify-center gap-4 sticky bottom-0 z-50 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
+        <button id="btn-prev" onclick="changeStage(-1)" class="px-6 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold rounded-lg transition disabled:opacity-50" disabled>
+            <i class="fas fa-chevron-left mr-1"></i> 이전 단계
+        </button>
+        <button id="btn-next" onclick="changeStage(1)" class="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg transition shadow-md disabled:opacity-50 disabled:cursor-not-allowed">
+            다음 단계 <i class="fas fa-chevron-right ml-1"></i>
+        </button>
+    </footer>
+
+    <script>
+        // State Management
+        const state = {
+            currentStage: 1,
+            totalStages: 4,
+            hints: { 1: 0, 2: 0, 3: 0 },
+            answers: { 1: null, 2: null, 3: null },
+            animations: {
+                bucket: { running: false, reqId: null, level: 10, outWidth: 10 },
+                cup: { running: false, reqId: null, time: 0 }
+            }
+        };
+
+        // Navigation Logic
+        function updateUI() {
+            // Hide all stages
+            for(let i=1; i<=state.totalStages; i++) {
+                document.getElementById(`stage-${i}`).classList.add('hidden');
+            }
+            // Show current
+            document.getElementById(`stage-${state.currentStage}`).classList.remove('hidden');
+            
+            // Update Header & Progress
+            document.getElementById('current-stage-display').innerText = state.currentStage;
+            document.getElementById('progress-bar').style.width = `${(state.currentStage / state.totalStages) * 100}%`;
+
+            // Buttons
+            const btnPrev = document.getElementById('btn-prev');
+            const btnNext = document.getElementById('btn-next');
+            
+            btnPrev.disabled = state.currentStage === 1;
+            
+            if (state.currentStage === state.totalStages) {
+                btnNext.classList.add('hidden');
+            } else {
+                btnNext.classList.remove('hidden');
+                // Require answer to proceed for stages 1-3
+                btnNext.disabled = !state.answers[state.currentStage];
+            }
+            
+            // Stop animations when leaving stage
+            if(state.currentStage !== 1) stopBucketAnimation();
+            if(state.currentStage !== 2) stopCupExperiment();
+        }
+
+        function changeStage(dir) {
+            const newStage = state.currentStage + dir;
+            if(newStage >= 1 && newStage <= state.totalStages) {
+                state.currentStage = newStage;
+                updateUI();
+            }
+        }
+
+        // Hint Logic
+        function revealHint(stageNum) {
+            if (state.hints[stageNum] < 3) {
+                state.hints[stageNum]++;
+                const hintLvl = state.hints[stageNum];
+                
+                // Show the specific hint div
+                const hintEl = document.getElementById(`hint-${stageNum}-${hintLvl}`);
+                if(hintEl) {
+                    hintEl.classList.remove('hidden-step');
+                    hintEl.classList.add('show-step');
+                }
+                
+                // Update counter
+                document.getElementById(`hint-count-${stageNum}`).innerText = hintLvl;
+            }
+        }
+
+        function checkAnswer(stageNum) {
+            const radios = document.getElementsByName(`ans${stageNum}`);
+            for (let radio of radios) {
+                if (radio.checked) {
+                    state.answers[stageNum] = radio.value;
+                    break;
+                }
+            }
+            // Enable next button if answered
+            document.getElementById('btn-next').disabled = false;
+            
+            // Highlight styling
+            const parentLabels = document.querySelectorAll(`input[name="ans${stageNum}"]`);
+            parentLabels.forEach(el => {
+                if(el.checked) el.parentElement.classList.add('bg-blue-100', 'border-blue-500');
+                else el.parentElement.classList.remove('bg-blue-100', 'border-blue-500');
+            });
+        }
+
+        // Stage 1 Animation
+        function startBucketAnimation() {
+            if (state.animations.bucket.running) return;
+            state.animations.bucket.running = true;
+            state.animations.bucket.level = 10;
+            animateBucket();
+        }
+
+        function stopBucketAnimation() {
+            state.animations.bucket.running = false;
+            cancelAnimationFrame(state.animations.bucket.reqId);
+        }
+
+        function animateBucket() {
+            if (!state.animations.bucket.running) return;
+            
+            const inflow = 0.5; // Constant
+            const outflow = state.animations.bucket.level * 0.01; // Proportional to level
+            
+            state.animations.bucket.level += (inflow - outflow);
+            
+            // Clamp level
+            if(state.animations.bucket.level > 100) state.animations.bucket.level = 100;
+            
+            // Map level to width for outflow visual (0 to max 30px)
+            const visualOutflowWidth = Math.min(10 + (state.animations.bucket.level * 0.4), 40);
+
+            document.getElementById('bucket-water').style.height = `${state.animations.bucket.level}%`;
+            document.getElementById('bucket-outflow').style.width = `${visualOutflowWidth}px`;
+
+            state.animations.bucket.reqId = requestAnimationFrame(animateBucket);
+        }
+
+        // Stage 2-1 Animation
+        function startCupExperiment() {
+            if (state.animations.cup.running) return;
+            
+            // Reset
+            state.animations.cup.time = 0;
+            state.animations.cup.running = true;
+            document.getElementById('lamp-rays-2').style.opacity = '1';
+            
+            // Setup Graph path
+            const svgPath = document.getElementById('temp-curve');
+            svgPath.setAttribute('d', `M 0 100`);
+            
+            animateGraph();
+        }
+
+        function stopCupExperiment() {
+            state.animations.cup.running = false;
+            cancelAnimationFrame(state.animations.cup.reqId);
+            document.getElementById('lamp-rays-2').style.opacity = '0';
+            document.getElementById('cup-radiation-2').classList.add('hidden');
+        }
+
+        function animateGraph() {
+            if (!state.animations.cup.running) return;
+            
+            state.animations.cup.time += 0.5;
+            const t = state.animations.cup.time;
+            const maxTime = 100; // 100% width
+            
+            if (t > maxTime) {
+                // Keep showing radiation
+                document.getElementById('cup-radiation-2').classList.remove('hidden');
+                return; // Stop drawing
+            }
+
+            // Math: y = Initial + (Max - Initial) * (1 - e^(-kt))
+            // SVG Y is inverted (0 is top, 100 is bottom). Equilibrium line is at Y=20%.
+            // Start at Y=100. Target Y=20.
+            const k = 0.05;
+            const currentY = 100 - (100 - 20) * (1 - Math.exp(-k * t));
+            
+            const path = document.getElementById('temp-curve');
+            const d = path.getAttribute('d');
+            path.setAttribute('d', `${d} L ${t} ${currentY}`);
+            
+            // Move indicator dot
+            const dot = document.getElementById('temp-indicator');
+            dot.style.left = `${t}%`;
+            dot.style.bottom = `${100 - currentY}%`;
+
+            // Start showing radiation as temp increases
+            if(t > 30) {
+                 document.getElementById('cup-radiation-2').classList.remove('hidden');
+            }
+
+            state.animations.cup.reqId = requestAnimationFrame(animateGraph);
+        }
+
+        // Stage 2-2 Logic
+        function setDistance(dist) {
+            const lamp = document.getElementById('movable-lamp');
+            const waves = document.getElementById('dist-waves');
+            const thermo = document.getElementById('dist-thermo');
+            const outHeat = document.getElementById('dist-out-heat');
+
+            if (dist === 'close') {
+                lamp.style.left = '40%'; // Move closer
+                waves.innerHTML = `
+                    <i class="fas fa-wifi fa-rotate-90 radiation-wave text-3xl text-red-500"></i>
+                    <i class="fas fa-wifi fa-rotate-90 radiation-wave text-4xl text-red-500 delay-75"></i>
+                    <i class="fas fa-wifi fa-rotate-90 radiation-wave text-5xl text-red-500 delay-150"></i>
+                `;
+                thermo.style.height = '90%'; // High temp
+                thermo.classList.remove('bg-blue-400');
+                thermo.classList.add('bg-red-500');
+                outHeat.innerHTML = `
+                    <i class="fas fa-chevron-up text-red-500 text-sm animate-bounce"></i>
+                    <i class="fas fa-chevron-up text-red-500 text-sm animate-bounce delay-75"></i>
+                    <i class="fas fa-chevron-up text-red-500 text-sm animate-bounce delay-150"></i>
+                `;
+            } else {
+                lamp.style.left = '5%'; // Move far
+                waves.innerHTML = `
+                    <i class="fas fa-wifi fa-rotate-90 radiation-wave text-2xl text-yellow-500 opacity-50"></i>
+                `;
+                thermo.style.height = '30%'; // Low temp
+                thermo.classList.remove('bg-red-500');
+                thermo.classList.add('bg-blue-400');
+                outHeat.innerHTML = `
+                    <i class="fas fa-chevron-up text-orange-400 text-xs animate-bounce opacity-50"></i>
+                `;
+            }
+        }
+
+        // Final Report Logic
+        function generateReport() {
+            const grade = document.getElementById('info-grade').value;
+            const cls = document.getElementById('info-class').value;
+            const num = document.getElementById('info-num').value;
+            const name = document.getElementById('info-name').value;
+            
+            if(!name) {
+                alert('이름을 입력해주세요!');
+                return;
+            }
+
+            // Populate Report
+            document.getElementById('display-user-info').innerText = `${grade}학년 ${cls}반 ${num}번 ${name}`;
+            document.getElementById('res-ans1').innerText = state.answers[1] || '미선택';
+            document.getElementById('res-ans2').innerText = state.answers[2] || '미선택';
+            document.getElementById('res-ans3').innerText = state.answers[3] || '미선택';
+            
+            const today = new Date();
+            document.getElementById('report-date').innerText = `${today.getFullYear()}년 ${today.getMonth()+1}월 ${today.getDate()}일 생성됨`;
+
+            // Switch UI
+            document.getElementById('student-form').classList.add('hidden');
+            document.getElementById('final-report-container').classList.remove('hidden');
+            
+            // Final step, hide next button
+            document.getElementById('btn-next').classList.add('hidden');
+        }
+
+        function downloadPNG() {
+            const node = document.getElementById('report-capture-area');
+            const msg = document.getElementById('download-msg');
+            
+            // Show some feedback
+            msg.classList.remove('hidden');
+            msg.innerText = "이미지를 생성중입니다. 잠시만 기다려주세요...";
+            msg.classList.replace('text-green-600', 'text-yellow-600');
+
+            domtoimage.toPng(node, { quality: 1, bgcolor: '#ffffff' })
+                .then(function (dataUrl) {
+                    const link = document.createElement('a');
+                    link.download = `복사평형_보고서_${document.getElementById('info-name').value}.png`;
+                    link.href = dataUrl;
+                    link.click();
+                    
+                    msg.innerText = "다운로드가 완료되었습니다!";
+                    msg.classList.replace('text-yellow-600', 'text-green-600');
+                    setTimeout(() => msg.classList.add('hidden'), 3000);
+                })
+                .catch(function (error) {
+                    console.error('oops, something went wrong!', error);
+                    msg.innerText = "저장 중 오류가 발생했습니다.";
+                    msg.classList.replace('text-yellow-600', 'text-red-600');
+                });
+        }
+
+        // Initialize
+        updateUI();
+
+    </script>
+</body>
+</html>
